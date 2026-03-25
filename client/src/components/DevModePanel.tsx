@@ -1,20 +1,24 @@
 /*
  * Obsidian Forge — Dev Mode Panel
  *
- * When IDE Dev Mode is active, this panel replaces the empty state in ChatThread
- * and provides:
+ * When IDE Dev Mode is active, this panel provides:
  *   1. Architecture Explorer — visual map of Dream IDE's components and modules
  *   2. Quick Actions — pre-built prompts for common IDE development tasks
- *   3. Dependency Graph — shows how modules connect
- *   4. Convention Reference — quick access to design system and coding rules
+ *   3. Design System — color tokens, typography, design prompts
+ *   4. Convention Reference — quick access to coding rules
+ *   5. Chat Bar — persistent input at bottom for direct AI prompting
+ *
+ * The chat bar is always visible regardless of which tab is active.
+ * Prompts are automatically wrapped with architecture context before sending.
  */
-import { useState, useMemo } from "react";
+import { useState, useRef, useMemo, useCallback } from "react";
 import {
   Code2, Layers, Zap, FileText, GitBranch, Palette,
   ChevronDown, ChevronRight, Box, Puzzle, Layout,
   BookOpen, Wrench, Bug, Paintbrush, FileCode,
   ArrowRight, ExternalLink, Sparkles, Shield,
-  Database, Terminal, Search, Eye, Cpu
+  Database, Terminal, Search, Eye, Cpu, Send, Paperclip,
+  MessageSquare, CornerDownLeft
 } from "lucide-react";
 import {
   ARCHITECTURE_MAP, DEV_MODE_QUICK_ACTIONS,
@@ -150,6 +154,76 @@ function QuickActionCard({ action, onSelect }: { action: DevModeAction; onSelect
   );
 }
 
+// ─── Chat Bar ─────────────────────────────────────────────────────
+
+function DevModeChatBar({ onSend }: { onSend: (prompt: string) => void }) {
+  const [input, setInput] = useState("");
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  const handleSend = useCallback(() => {
+    const text = input.trim();
+    if (!text) return;
+    onSend(text);
+    setInput("");
+    inputRef.current?.focus();
+  }, [input, onSend]);
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      handleSend();
+    }
+  };
+
+  return (
+    <div className="border-t border-forge-amber/15 bg-forge-gutter/80 p-2 shrink-0">
+      {/* Context indicator */}
+      <div className="flex items-center gap-1.5 px-2 mb-1.5">
+        <Cpu className="w-2.5 h-2.5 text-forge-amber/40" />
+        <span className="text-[9px] text-forge-amber/30 font-medium">Architecture context will be injected</span>
+      </div>
+
+      {/* Input area */}
+      <div className="flex items-end gap-2 bg-forge-surface-raised/80 rounded-lg px-3 py-2 border border-forge-amber/10 focus-within:border-forge-amber/25 transition-colors">
+        <textarea
+          ref={inputRef}
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={handleKeyDown}
+          placeholder="Ask AI to modify Dream IDE..."
+          rows={1}
+          className="flex-1 bg-transparent text-[12px] text-foreground placeholder:text-forge-amber/20 resize-none outline-none min-h-[20px] max-h-[100px]"
+          style={{ fieldSizing: "content" } as React.CSSProperties}
+        />
+        <button
+          onClick={handleSend}
+          disabled={!input.trim()}
+          className={cn(
+            "p-1.5 rounded transition-colors shrink-0 mb-0.5",
+            input.trim()
+              ? "bg-forge-amber text-forge-gutter hover:bg-forge-amber/90"
+              : "text-muted-foreground/15"
+          )}
+        >
+          <Send className="w-3.5 h-3.5" />
+        </button>
+      </div>
+
+      {/* Hints */}
+      <div className="flex items-center justify-between px-2 mt-1">
+        <p className="text-[9px] text-muted-foreground/20">
+          <kbd className="font-mono-code bg-forge-surface-overlay/50 px-1 py-0.5 rounded text-[8px]">Enter</kbd>
+          <span className="ml-1">to send</span>
+          <span className="mx-1.5 text-muted-foreground/10">·</span>
+          <kbd className="font-mono-code bg-forge-surface-overlay/50 px-1 py-0.5 rounded text-[8px]">Shift+Enter</kbd>
+          <span className="ml-1">new line</span>
+        </p>
+        <span className="text-[8px] text-forge-amber/20 font-mono-code">dev-mode</span>
+      </div>
+    </div>
+  );
+}
+
 // ─── Main Panel ────────────────────────────────────────────────────
 
 type DevTab = "actions" | "architecture" | "design" | "conventions";
@@ -171,7 +245,7 @@ export default function DevModePanel({ onSendPrompt }: { onSendPrompt: (prompt: 
 
   const tabs: { id: DevTab; label: string; icon: React.ReactNode }[] = [
     { id: "actions", label: "Actions", icon: <Zap className="w-3 h-3" /> },
-    { id: "architecture", label: "Architecture", icon: <Layers className="w-3 h-3" /> },
+    { id: "architecture", label: "Arch", icon: <Layers className="w-3 h-3" /> },
     { id: "design", label: "Design", icon: <Palette className="w-3 h-3" /> },
     { id: "conventions", label: "Code", icon: <Code2 className="w-3 h-3" /> },
   ];
@@ -190,7 +264,7 @@ export default function DevModePanel({ onSendPrompt }: { onSendPrompt: (prompt: 
           </span>
         </div>
         <p className="text-[10px] text-muted-foreground/40 leading-relaxed">
-          Develop Dream IDE with AI assistance. The agent has full knowledge of the codebase architecture.
+          Develop Dream IDE with AI. Type below or pick a quick action.
         </p>
       </div>
 
@@ -213,7 +287,7 @@ export default function DevModePanel({ onSendPrompt }: { onSendPrompt: (prompt: 
         ))}
       </div>
 
-      {/* Content */}
+      {/* Scrollable content area */}
       <div className="flex-1 overflow-y-auto p-2">
         {activeTab === "actions" && (
           <div className="space-y-2">
@@ -379,6 +453,9 @@ export default function DevModePanel({ onSendPrompt }: { onSendPrompt: (prompt: 
           </div>
         )}
       </div>
+
+      {/* ─── Persistent Chat Bar ─────────────────────────────────── */}
+      <DevModeChatBar onSend={onSendPrompt} />
     </div>
   );
 }
