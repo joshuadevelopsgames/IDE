@@ -1,6 +1,10 @@
 /*
  * Obsidian Forge — Main Workspace
- * Three-column asymmetric layout: file tree | editor+terminal | right panel (agent/chat/approvals/settings).
+ *
+ * Three-column asymmetric layout: file tree | editor+terminal | right panel.
+ * The right panel is now a unified agent view: the Chat IS the run view.
+ * Activity bar provides: Agent (unified run view), Approvals, Settings.
+ *
  * Thin command strip top bar, status bar at bottom.
  */
 import { lazy, Suspense } from "react";
@@ -11,11 +15,10 @@ import {
   FolderTree, Play, MessageSquare, ShieldAlert, Settings,
   Terminal as TerminalIcon, Search, Command, ChevronLeft, X, Minus, Square,
   Maximize2, Circle, GitBranch, Wifi, WifiOff, Loader2,
-  PanelRightClose, PanelRightOpen
+  PanelRightClose, PanelRightOpen, Sparkles, History
 } from "lucide-react";
 import FileTree from "@/components/FileTree";
 import CodeEditor from "@/components/CodeEditor";
-import AgentPanel from "@/components/AgentPanel";
 import ChatThread from "@/components/ChatThread";
 import ApprovalsQueue from "@/components/ApprovalsQueue";
 import SettingsPanel from "@/components/SettingsPanel";
@@ -74,12 +77,16 @@ function TitleBar() {
 }
 
 function ActivityBar() {
-  const { rightPanel, setRightPanel, currentRun, terminalOpen, setTerminalOpen } = useIDEStore();
+  const { rightPanel, setRightPanel, currentRun, terminalOpen, setTerminalOpen, agentStatus } = useIDEStore();
   const pendingApprovals = currentRun?.approvals.filter((a) => a.status === "pending").length || 0;
 
-  const items: { id: RightPanel; icon: React.ReactNode; label: string; badge?: number }[] = [
-    { id: "agent", icon: <Play className="w-4 h-4" />, label: "Agent" },
-    { id: "chat", icon: <MessageSquare className="w-4 h-4" />, label: "Chat" },
+  const items: { id: RightPanel; icon: React.ReactNode; label: string; badge?: number; pulse?: boolean }[] = [
+    {
+      id: "chat",
+      icon: <Sparkles className="w-4 h-4" />,
+      label: "Agent",
+      pulse: agentStatus === "running" || agentStatus === "thinking",
+    },
     {
       id: "approvals",
       icon: <ShieldAlert className="w-4 h-4" />,
@@ -112,6 +119,9 @@ function ActivityBar() {
               {item.badge}
             </span>
           )}
+          {item.pulse && rightPanel !== item.id && (
+            <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-forge-amber animate-pulse" />
+          )}
         </button>
       ))}
 
@@ -139,10 +149,10 @@ function StatusBar() {
   const { agentStatus, currentRun, currentProject, settings } = useIDEStore();
 
   const statusConfig: Record<AgentStatus, { color: string; label: string }> = {
-    idle: { color: "text-muted-foreground/40", label: "Idle" },
+    idle: { color: "text-muted-foreground/40", label: "Ready" },
     thinking: { color: "text-forge-amber", label: "Thinking..." },
-    running: { color: "text-forge-amber", label: "Running" },
-    waiting_approval: { color: "text-yellow-400", label: "Waiting for approval" },
+    running: { color: "text-forge-amber", label: "Working" },
+    waiting_approval: { color: "text-yellow-400", label: "Awaiting approval" },
     error: { color: "text-forge-coral", label: "Error" },
     disconnected: { color: "text-muted-foreground/30", label: "Disconnected" },
   };
@@ -197,7 +207,6 @@ function RightPanelContent() {
   const { rightPanel } = useIDEStore();
 
   switch (rightPanel) {
-    case "agent": return <AgentPanel />;
     case "chat": return <ChatThread />;
     case "approvals": return <ApprovalsQueue />;
     case "settings": return <SettingsPanel />;
@@ -251,7 +260,7 @@ export default function Workspace() {
             </PanelGroup>
           </Panel>
 
-          {/* Right panel */}
+          {/* Right panel — unified agent view */}
           {showRightPanel && (
             <>
               <PanelResizeHandle className="w-[1px] bg-border hover:bg-forge-amber/30 transition-colors" />

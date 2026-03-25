@@ -5,7 +5,7 @@
 import { FolderOpen, Clock, ChevronRight, Plus, Zap } from "lucide-react";
 import { useIDEStore } from "@/lib/store";
 import { DEMO_FILE_TREE } from "@/lib/demo-data";
-import { createDemoRun } from "@/lib/demo-data";
+
 import { cn } from "@/lib/utils";
 
 export default function Home() {
@@ -13,12 +13,8 @@ export default function Home() {
 
   const handleOpenProject = (project: { name: string; path: string; lastOpened: number }) => {
     setFileTree(DEMO_FILE_TREE);
-    // Load demo run for showcase
-    const store = useIDEStore.getState();
-    const demoRun = createDemoRun();
-    store.currentRun = demoRun as any;
-    store.agentStatus = "running" as any;
-    useIDEStore.setState({ currentRun: demoRun, agentStatus: "running" });
+    // Open project and default to the unified agent chat panel
+    useIDEStore.setState({ rightPanel: "chat" });
     openProject(project);
   };
 

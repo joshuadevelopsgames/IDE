@@ -43,7 +43,7 @@ export default function CommandPalette() {
       category: "Panels",
       icon: <Play className="w-3.5 h-3.5" />,
       shortcut: "Ctrl+1",
-      action: () => { setRightPanel("agent"); setCommandPaletteOpen(false); },
+      action: () => { setRightPanel("chat"); setCommandPaletteOpen(false); },
     },
     {
       id: "chat-panel",

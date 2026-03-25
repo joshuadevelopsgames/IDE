@@ -95,7 +95,7 @@ export interface IDESettings {
 }
 
 export type ActiveView = "home" | "workspace";
-export type RightPanel = "agent" | "chat" | "approvals" | "settings" | "none";
+export type RightPanel = "chat" | "approvals" | "settings" | "none";
 
 // ─── Store ───────────────────────────────────────────────────────────
 
@@ -168,7 +168,7 @@ export const useIDEStore = create<IDEState>()(
     setActiveView: (view) => set((s) => { s.activeView = view; }),
 
     // Right panel
-    rightPanel: "agent",
+    rightPanel: "chat",
     setRightPanel: (panel) => set((s) => { s.rightPanel = panel; }),
     rightPanelWidth: 380,
     setRightPanelWidth: (w) => set((s) => { s.rightPanelWidth = w; }),
@@ -249,7 +249,7 @@ export const useIDEStore = create<IDEState>()(
         };
         s.currentRun = run;
         s.agentStatus = "thinking";
-        s.rightPanel = "agent";
+        s.rightPanel = "chat";
       }),
     addMessage: (msg) =>
       set((s) => {
