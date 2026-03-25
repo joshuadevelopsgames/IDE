@@ -95,7 +95,7 @@ export interface IDESettings {
 }
 
 export type ActiveView = "home" | "workspace";
-export type RightPanel = "chat" | "approvals" | "settings" | "none";
+export type RightPanel = "chat" | "approvals" | "settings" | "devmode" | "none";
 
 // ─── Store ───────────────────────────────────────────────────────────
 
@@ -159,6 +159,11 @@ interface IDEState {
   // Search
   searchOpen: boolean;
   setSearchOpen: (open: boolean) => void;
+
+  // Dev Mode
+  devModeActive: boolean;
+  setDevModeActive: (active: boolean) => void;
+  toggleDevMode: () => void;
 }
 
 export const useIDEStore = create<IDEState>()(
@@ -335,5 +340,14 @@ export const useIDEStore = create<IDEState>()(
     // Search
     searchOpen: false,
     setSearchOpen: (open) => set((s) => { s.searchOpen = open; }),
+
+    // Dev Mode
+    devModeActive: false,
+    setDevModeActive: (active) => set((s) => { s.devModeActive = active; }),
+    toggleDevMode: () => set((s) => {
+      s.devModeActive = !s.devModeActive;
+      if (s.devModeActive) s.rightPanel = "devmode";
+      else if (s.rightPanel === "devmode") s.rightPanel = "chat";
+    }),
   }))
 );

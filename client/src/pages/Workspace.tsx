@@ -2,12 +2,13 @@
  * Obsidian Forge — Main Workspace
  *
  * Three-column asymmetric layout: file tree | editor+terminal | right panel.
- * The right panel is now a unified agent view: the Chat IS the run view.
- * Activity bar provides: Agent (unified run view), Approvals, Settings.
+ * The right panel is a unified agent view: the Chat IS the run view.
+ * Activity bar: Agent, Dev Mode, Approvals, Settings, Terminal.
  *
- * Thin command strip top bar, status bar at bottom.
+ * Dev Mode toggle in activity bar switches between normal and self-development mode.
+ * When active, the agent receives full architecture context about Dream IDE.
  */
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, useCallback } from "react";
 import {
   PanelGroup, Panel, PanelResizeHandle
 } from "react-resizable-panels";
@@ -15,22 +16,25 @@ import {
   FolderTree, Play, MessageSquare, ShieldAlert, Settings,
   Terminal as TerminalIcon, Search, Command, ChevronLeft, X, Minus, Square,
   Maximize2, Circle, GitBranch, Wifi, WifiOff, Loader2,
-  PanelRightClose, PanelRightOpen, Sparkles, History
+  PanelRightClose, PanelRightOpen, Sparkles, History, Cpu
 } from "lucide-react";
 import FileTree from "@/components/FileTree";
 import CodeEditor from "@/components/CodeEditor";
 import ChatThread from "@/components/ChatThread";
 import ApprovalsQueue from "@/components/ApprovalsQueue";
 import SettingsPanel from "@/components/SettingsPanel";
+import DevModePanel from "@/components/DevModePanel";
 import CommandPalette from "@/components/CommandPalette";
 import { useIDEStore, type RightPanel, type AgentStatus } from "@/lib/store";
 import { cn } from "@/lib/utils";
+import { devModeManager } from "@/lib/dev-mode";
+import { hermesBridge } from "@/lib/hermes-bridge";
 
 // Lazy-load terminal to avoid loading xterm.js until needed
 const TerminalPanel = lazy(() => import("@/components/Terminal"));
 
 function TitleBar() {
-  const { setActiveView, currentProject, setCommandPaletteOpen } = useIDEStore();
+  const { setActiveView, currentProject, setCommandPaletteOpen, devModeActive } = useIDEStore();
 
   return (
     <div className="flex items-center h-[36px] bg-forge-gutter border-b border-border select-none shrink-0">
@@ -50,6 +54,11 @@ function TitleBar() {
         <span className="text-[12px] font-semibold text-foreground/80 truncate ml-1">
           {currentProject?.name || "Dream IDE"}
         </span>
+        {devModeActive && (
+          <span className="text-[8px] px-1.5 py-0.5 rounded-full bg-forge-amber/15 text-forge-amber font-semibold ml-2 uppercase tracking-wider">
+            Dev Mode
+          </span>
+        )}
       </div>
 
       {/* Center: command bar trigger */}
@@ -77,7 +86,7 @@ function TitleBar() {
 }
 
 function ActivityBar() {
-  const { rightPanel, setRightPanel, currentRun, terminalOpen, setTerminalOpen, agentStatus } = useIDEStore();
+  const { rightPanel, setRightPanel, currentRun, terminalOpen, setTerminalOpen, agentStatus, devModeActive, toggleDevMode } = useIDEStore();
   const pendingApprovals = currentRun?.approvals.filter((a) => a.status === "pending").length || 0;
 
   const items: { id: RightPanel; icon: React.ReactNode; label: string; badge?: number; pulse?: boolean }[] = [
@@ -128,6 +137,26 @@ function ActivityBar() {
       {/* Spacer */}
       <div className="flex-1" />
 
+      {/* Dev Mode toggle */}
+      <button
+        onClick={() => {
+          toggleDevMode();
+          devModeManager.toggle();
+        }}
+        className={cn(
+          "relative w-8 h-8 rounded flex items-center justify-center transition-colors",
+          devModeActive
+            ? "bg-forge-amber/15 text-forge-amber ring-1 ring-forge-amber/30"
+            : "text-muted-foreground/50 hover:text-muted-foreground hover:bg-forge-surface-raised/50"
+        )}
+        title={devModeActive ? "Dev Mode Active — Click to deactivate" : "IDE Dev Mode — Develop Dream IDE with AI"}
+      >
+        <Cpu className="w-4 h-4" />
+        {devModeActive && (
+          <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-forge-amber" />
+        )}
+      </button>
+
       {/* Terminal toggle */}
       <button
         onClick={() => setTerminalOpen(!terminalOpen)}
@@ -146,7 +175,7 @@ function ActivityBar() {
 }
 
 function StatusBar() {
-  const { agentStatus, currentRun, currentProject, settings } = useIDEStore();
+  const { agentStatus, currentRun, currentProject, settings, devModeActive } = useIDEStore();
 
   const statusConfig: Record<AgentStatus, { color: string; label: string }> = {
     idle: { color: "text-muted-foreground/40", label: "Ready" },
@@ -178,6 +207,13 @@ function StatusBar() {
             {currentRun.plan.filter((s) => s.status === "complete").length}/{currentRun.plan.length} steps
           </span>
         )}
+
+        {devModeActive && (
+          <span className="flex items-center gap-1 text-forge-amber/60">
+            <Cpu className="w-2.5 h-2.5" />
+            <span>Dev Mode</span>
+          </span>
+        )}
       </div>
 
       {/* Center */}
@@ -204,10 +240,23 @@ function StatusBar() {
 }
 
 function RightPanelContent() {
-  const { rightPanel } = useIDEStore();
+  const { rightPanel, setRightPanel, devModeActive } = useIDEStore();
+
+  // When dev mode is active and user clicks Agent, show dev mode panel first
+  // They can still access normal chat by sending a message from dev mode
+  const handleDevModeSendPrompt = useCallback((prompt: string) => {
+    // Switch to chat panel and send the prompt with dev mode context
+    setRightPanel("chat");
+    // Small delay to let the panel switch, then trigger the prompt
+    setTimeout(() => {
+      const wrappedPrompt = devModeManager.wrapPrompt(prompt);
+      hermesBridge.prompt(wrappedPrompt);
+    }, 100);
+  }, [setRightPanel]);
 
   switch (rightPanel) {
     case "chat": return <ChatThread />;
+    case "devmode": return <DevModePanel onSendPrompt={handleDevModeSendPrompt} />;
     case "approvals": return <ApprovalsQueue />;
     case "settings": return <SettingsPanel />;
     default: return null;

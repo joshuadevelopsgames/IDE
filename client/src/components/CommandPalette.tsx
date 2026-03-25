@@ -5,7 +5,7 @@
 import { useEffect, useState, useMemo } from "react";
 import {
   Search, File, Settings, MessageSquare, ShieldAlert,
-  Play, FolderOpen, Terminal, GitCompare, Command
+  Play, FolderOpen, Terminal, GitCompare, Command, Cpu
 } from "lucide-react";
 import { useIDEStore } from "@/lib/store";
 import { cn } from "@/lib/utils";
@@ -23,7 +23,7 @@ export default function CommandPalette() {
   const {
     commandPaletteOpen, setCommandPaletteOpen,
     setRightPanel, setActiveView, setTerminalOpen,
-    fileTree
+    fileTree, devModeActive, toggleDevMode
   } = useIDEStore();
   const [query, setQuery] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(0);
@@ -85,7 +85,22 @@ export default function CommandPalette() {
       shortcut: "Ctrl+Shift+D",
       action: () => { setCommandPaletteOpen(false); },
     },
-  ], [setActiveView, setRightPanel, setCommandPaletteOpen, setTerminalOpen]);
+    {
+      id: "toggle-dev-mode",
+      label: devModeActive ? "Deactivate IDE Dev Mode" : "Activate IDE Dev Mode",
+      category: "Dev Mode",
+      icon: <Cpu className="w-3.5 h-3.5" />,
+      shortcut: "Ctrl+Shift+M",
+      action: () => { toggleDevMode(); setCommandPaletteOpen(false); },
+    },
+    {
+      id: "dev-mode-panel",
+      label: "Show Dev Mode Panel",
+      category: "Dev Mode",
+      icon: <Cpu className="w-3.5 h-3.5" />,
+      action: () => { setRightPanel("devmode"); setCommandPaletteOpen(false); },
+    },
+  ], [setActiveView, setRightPanel, setCommandPaletteOpen, setTerminalOpen, devModeActive, toggleDevMode]);
 
   const filtered = useMemo(() => {
     if (!query) return commands;

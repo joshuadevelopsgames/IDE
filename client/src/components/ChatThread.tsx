@@ -14,7 +14,8 @@
  *
  * Each block corresponds to an ACP event from Hermes.
  */
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
+import { Cpu } from "lucide-react";
 import {
   Send, User, Bot, Terminal, Loader2, Paperclip, Brain,
   ChevronDown, ChevronRight, FileText, Search, CheckCircle2,
@@ -30,6 +31,7 @@ import {
   type StreamDeltaData, type PermissionRequestData
 } from "@/lib/hermes-bridge";
 import { cn } from "@/lib/utils";
+import { devModeManager } from "@/lib/dev-mode";
 
 // ─── Block Types (rendered in the run stream) ───────────────────────
 
@@ -568,8 +570,10 @@ export default function ChatThread() {
 
     setInput("");
 
-    // Send to Hermes via ACP
-    hermesBridge.prompt(text);
+    // Send to Hermes via ACP — inject dev mode context if active
+    const devModeActive = useIDEStore.getState().devModeActive;
+    const promptText = devModeActive ? devModeManager.wrapPrompt(text) : text;
+    hermesBridge.prompt(promptText);
   }, [input, currentRun, startRun, addMessage]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -617,27 +621,51 @@ export default function ChatThread() {
       <div ref={scrollRef} className="flex-1 overflow-y-auto py-2">
         {blocks.length === 0 && !streamContent ? (
           <div className="flex-1 flex items-center justify-center h-full p-6">
-            <div className="text-center space-y-3">
-              <div className="w-12 h-12 mx-auto rounded-xl bg-forge-surface-raised flex items-center justify-center">
-                <Sparkles className="w-6 h-6 text-muted-foreground/30" />
+            {useIDEStore.getState().devModeActive ? (
+              <div className="text-center space-y-3">
+                <div className="w-12 h-12 mx-auto rounded-xl bg-forge-amber/10 flex items-center justify-center">
+                  <Cpu className="w-6 h-6 text-forge-amber/60" />
+                </div>
+                <p className="text-[13px] font-medium text-forge-amber/80">IDE Dev Mode Active</p>
+                <p className="text-[11px] text-muted-foreground/30 max-w-[260px] leading-relaxed">
+                  The agent has full knowledge of Dream IDE's architecture.
+                  Ask it to add features, fix bugs, or refactor the codebase.
+                </p>
+                <div className="flex flex-wrap gap-1.5 justify-center pt-2 max-w-[300px] mx-auto">
+                  {["Add Git integration", "Add run history", "Improve animations", "Split the store"].map((s) => (
+                    <button
+                      key={s}
+                      onClick={() => { setInput(s); inputRef.current?.focus(); }}
+                      className="px-2 py-1 text-[10px] rounded-full border border-forge-amber/20 text-forge-amber/50 hover:text-forge-amber hover:border-forge-amber/40 transition-colors"
+                    >
+                      {s}
+                    </button>
+                  ))}
+                </div>
               </div>
-              <p className="text-[13px] font-medium text-foreground/60">What can I help you build?</p>
-              <p className="text-[11px] text-muted-foreground/30 max-w-[260px] leading-relaxed">
-                Describe a task and Hermes will plan, implement, and verify the changes.
-                You'll see every step, file change, and command before it runs.
-              </p>
-              <div className="flex flex-wrap gap-1.5 justify-center pt-2 max-w-[300px] mx-auto">
-                {["Add dark mode", "Fix the login bug", "Refactor to TypeScript", "Add API endpoint"].map((s) => (
-                  <button
-                    key={s}
-                    onClick={() => { setInput(s); inputRef.current?.focus(); }}
-                    className="px-2 py-1 text-[10px] rounded-full border border-border text-muted-foreground/40 hover:text-muted-foreground hover:border-forge-amber/30 transition-colors"
-                  >
-                    {s}
-                  </button>
-                ))}
+            ) : (
+              <div className="text-center space-y-3">
+                <div className="w-12 h-12 mx-auto rounded-xl bg-forge-surface-raised flex items-center justify-center">
+                  <Sparkles className="w-6 h-6 text-muted-foreground/30" />
+                </div>
+                <p className="text-[13px] font-medium text-foreground/60">What can I help you build?</p>
+                <p className="text-[11px] text-muted-foreground/30 max-w-[260px] leading-relaxed">
+                  Describe a task and Hermes will plan, implement, and verify the changes.
+                  You'll see every step, file change, and command before it runs.
+                </p>
+                <div className="flex flex-wrap gap-1.5 justify-center pt-2 max-w-[300px] mx-auto">
+                  {["Add dark mode", "Fix the login bug", "Refactor to TypeScript", "Add API endpoint"].map((s) => (
+                    <button
+                      key={s}
+                      onClick={() => { setInput(s); inputRef.current?.focus(); }}
+                      className="px-2 py-1 text-[10px] rounded-full border border-border text-muted-foreground/40 hover:text-muted-foreground hover:border-forge-amber/30 transition-colors"
+                    >
+                      {s}
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
           </div>
         ) : (
           <>
@@ -686,7 +714,7 @@ export default function ChatThread() {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Describe what you want to build or change..."
+            placeholder={useIDEStore.getState().devModeActive ? "Describe what to change in Dream IDE..." : "Describe what you want to build or change..."}
             rows={1}
             className="flex-1 bg-transparent text-[12.5px] text-foreground placeholder:text-muted-foreground/25 resize-none outline-none min-h-[20px] max-h-[120px]"
             style={{ fieldSizing: "content" } as React.CSSProperties}
@@ -706,6 +734,9 @@ export default function ChatThread() {
         </div>
         <p className="text-[9px] text-muted-foreground/20 mt-1 px-1">
           Enter to send · Shift+Enter for new line
+          {useIDEStore.getState().devModeActive && (
+            <span className="text-forge-amber/30 ml-2">· Dev Mode: architecture context injected</span>
+          )}
         </p>
       </div>
     </div>
